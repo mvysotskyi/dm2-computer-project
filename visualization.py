@@ -62,6 +62,6 @@ class Simulation:
 
 if __name__ == "__main__":
     game = GameOfLife(80, 60)
-    game.init_rpentomino(bias=(40, 30))
+    game.init_gilder_gun(bias=(30, 25))
     simulation = Simulation(game)
     simulation.run()
