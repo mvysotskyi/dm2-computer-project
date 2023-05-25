@@ -1,0 +1,5 @@
+llvmlite==0.40.0
+numba==0.57.0
+numpy==1.24.3
+pygame==2.4.0
+PyOpenGL-accelerate @ file:///C:/Users/mikol/OneDrive/%D0%A0%D0%BE%D0%B1%D0%BE%D1%87%D0%B8%D0%B9%20%D1%81%D1%82%D1%96%D0%BB/dm2-computer-project/PyOpenGL_accelerate-3.1.6-cp311-cp311-win_amd64.whl
