@@ -38,7 +38,7 @@ class Lenia:
         cells = ndimage.zoom(cells, self.scale, order=0)
         self.cx = self.size // 2 - cells.shape[0] // 2
         self.cy = self.size // 2 - cells.shape[1] // 2
-        
+
         self.world[self.cx:self.cx+cells.shape[0], self.cy:self.cy+cells.shape[1]] = cells
 
     def __bell_function(self, x, m, s):
@@ -68,53 +68,3 @@ class Lenia:
         """
         self.__update()
         return self.world
-
-if __name__ == "__main__":
-    import time
-    a = Lenia()
-    while True:
-        a.next()
-        print(a.world)
-        time.sleep(1)
-
-# bell = lambda x, m, s: np.exp(-((x-m)/s)**2 / 2)
-# size = 64
-# ''' scaling factor and initial position '''
-# scale = 1;  cx, cy = 20, 20
-# ''' load pattern, including parameters R, T, m, s, and cells '''
-# #T = 10
-# #R = 13
-# globals().update(pattern["orbium"]);  C = np.asarray(cells)
-# ''' create empty world '''
-# #A = np.random.rand(size, size)
-# A = np.zeros([size, size])
-# ''' place scaled pattern '''
-# C = scipy.ndimage.zoom(C, scale, order=0);  R *= scale
-# A[cx:cx+C.shape[0], cy:cy+C.shape[1]] = C
-
-# def smooth_ring_kernel(R):
-#     bell = lambda x, m, s: np.exp(-((x-m)/s)**2 / 2)
-#     X, Y = np.ogrid[-R:R, -R:R]
-#     # Increase X  and Y by 1 to avoid division by zero
-#     X += 1;  Y += 1
-
-#     D = np.sqrt(X**2 + Y**2) / R
-#     K = (D < 1) * bell(D, 0.5, 0.15)
-#     K = K / np.sum(K)
-#     return K
-
-# K = smooth_ring_kernel(R)
-
-# def growth(U):
-#   #m = 0.15
-#   #s = 0.015
-#   return bell(U, m, s)*2-1
-# def update(i):
-#   global A, img
-#   U = scipy.signal.convolve2d(A, K, mode='same', boundary='wrap')
-#   A = np.clip(A + 1/T * growth(U), 0, 1)
-#   img.set_array(A)
-#   return img,
-# figure_asset(K, growth)
-# fig = figure_world(A)
-# IPython.display.HTML(matplotlib.animation.FuncAnimation(fig, update, frames=200, interval=20).to_jshtml())
