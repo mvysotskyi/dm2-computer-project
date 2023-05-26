@@ -2,8 +2,11 @@
 Visualization module for Lenia using Pygame.
 """
 
+import numpy as np
+
 import pygame
 from lenia import Lenia
+
 
 class LeniaVisualizer:
     """
@@ -20,12 +23,17 @@ class LeniaVisualizer:
         self.screen.fill((0, 0, 0))
         # Draw the world
         cell_size = self.screen_width // self.lenia.size
+        world = np.dstack(self.lenia.world)
 
-        for x in range(self.lenia.size):
-            for y in range(self.lenia.size):
-                color = int(self.lenia.world[x, y] * 255)
-                pygame.draw.rect(self.screen, (color, color, color), (x * cell_size, y * cell_size, cell_size, cell_size))
-        pygame.display.flip()
+        world *= 255
+        surf = pygame.surfarray.make_surface(world)
+        self.screen.blit(surf, (0, 0))
+        # for x in range(self.lenia.size):
+        #     for y in range(self.lenia.size):
+        #         # color = world[x, y] * 255
+        #         pygame.draw.rect(self.screen, tuple(world[x, y]), (x * cell_size, y * cell_size, cell_size, cell_size))
+
+        pygame.display.update()
 
     def run(self):
         """
@@ -36,9 +44,12 @@ class LeniaVisualizer:
             self.lenia.next()
             self.clock.tick(30)
 
-            (exit() for event in pygame.event.get() if event.type == pygame.QUIT)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    quit()
 
 if __name__ == "__main__":
-    _lenia = Lenia(size=128, scale=1)
+    _lenia = Lenia(pattern="emitter", size=800, scale=8, start_x=5, start_y=5)
     visualizer = LeniaVisualizer(_lenia)
     visualizer.run()
