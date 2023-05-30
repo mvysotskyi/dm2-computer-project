@@ -75,8 +75,6 @@ class Ant:
             self.return_state = 0
             self.search_state = 1
             Ant.food_collected += 1
-            print(Ant.food_collected)
-            print('return:', self.time)
             self.time = 0
             self.pheromon_strength = Ant.pheromone_max
         elif self.return_state:
