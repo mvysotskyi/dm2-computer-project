@@ -164,10 +164,12 @@ class Lenia:
 
     def __smooth_ring_kernel(self, radius: float) -> list[cp.ndarray]:
         mid = self.size // 2
-        distance_array = [np.linalg.norm(np.ogrid[-mid : mid, -mid : mid]) / radius * len(k['b']) / k['r']
+        distance_array = [np.linalg.norm(np.ogrid[-mid:mid, -mid:mid]) / radius * len(k['b']) / k['r']
                           for k in self.pattern['kernels']]
-        kernels = [(D < len(k['b'])) * np.asarray(k['b'])[np.minimum(D.astype(int), len(k['b']) - 1)] * \
-                   self.bell_function(D % 1, 0.5, 0.15) for D, k in zip(distance_array, self.pattern['kernels'])]
+
+        kernels = [(dmatrix < len(k['b'])) * np.asarray(k['b'])[np.minimum(dmatrix.astype(int), len(k['b']) - 1)] * \
+                   self.bell_function(dmatrix % 1, 0.5, 0.15) for dmatrix, k in zip(distance_array, self.pattern['kernels'])]
+        print(len(kernels))
 
         normalized_kernels = [kernel / np.sum(kernel) for kernel in kernels]
         fourier_kernels = [np.fft.fft2(np.fft.fftshift(nkernel)) for nkernel in normalized_kernels]
@@ -178,8 +180,8 @@ class Lenia:
 
     def __update(self):
         fourier_world = [cp.fft.fft2(world_chanel) for world_chanel in self.world]
-        wn_sums = [cp.real(cp.fft.ifft2(fK * fourier_world[k['c0']]))
-                      for fK, k in zip(self.fourier_kernels, self.pattern['kernels'])]
+        wn_sums = [cp.real(cp.fft.ifft2(fkernel * fourier_world[k['c0']]))
+                      for fkernel, k in zip(self.fourier_kernels, self.pattern['kernels'])]
 
         growns = [self.__growth(wn_sum, k['m'], k['s'])
                   for wn_sum, k in zip(wn_sums, self.pattern['kernels'])]
