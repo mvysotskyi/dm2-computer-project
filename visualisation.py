@@ -1,5 +1,5 @@
 '''
-Visualisation of forest fire.
+Visualisation of ant colony.
 '''
 from math import ceil
 import pygame
