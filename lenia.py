@@ -2,12 +2,10 @@
 Lenia module
 '''
 
-# Impoting all necessary modules
 import numpy as np
-from scipy import ndimage
+import cupy as cp
 
-# Ignoring warnings
-np.warnings.filterwarnings('ignore', category = np.VisibleDeprecationWarning)
+from scipy import ndimage
 
 class Lenia:
     '''
@@ -111,76 +109,97 @@ class Lenia:
 
     def __init__(
             self,
-            pattern: str = 'orbium',
+            pattern: str = "orbium",
             size: int = 64,
             scale: int = 1,
             start_x: int = 20,
-            start_y: int = 20
+            start_y: int = 20,
+            cells_amount: int = 1
             ):
-        '''
+        """
         Initialization function for Leina class \
 
         It initializaes of all the necessary attributes
-        '''
+        """
+        assert 1 <= cells_amount <= 5, 'Wrong number of cells'
+
         self.pattern = self.patterns[pattern] # What patten It will use for generating
         self.size = size # Size of field
         self.scale = scale
         self.start_pos = (start_x, start_y) # Where the starts
-        self.world = [np.zeros((size, size)) for _ in range(3)] # Full black world
+        self.world = [cp.zeros((size, size)) for _ in range(3)] # Full black world
+
         self.__init_pattern()
-        self.cells_amount(5)
         self.period = self.pattern['T']
         self.fourier_kernels = self.__smooth_ring_kernel(self.pattern['R'] * self.scale)
 
-    def cells_amount(self, num: int = 1, step: int = 50):
-        for k in range(1, num):
-            self.start_pos = (k * step, k * step)
-            self.__init_pattern()
-
     def __init_pattern(self):
-        '''
+        """
         Initialize the world with the pattern
-        '''
+        """
         cells = self.pattern['cells']
         cells = [ndimage.zoom(c, self.scale, order = 0) for c in cells]
         for world, cells_group in zip(self.world, cells):
+            cells_group = cp.asarray(cells_group)
             world[
                 self.start_pos[0] : self.start_pos[0] + cells_group.shape[0],
                 self.start_pos[1] : self.start_pos[1] + cells_group.shape[1]
                  ] = cells_group
 
     @staticmethod
-    def __bell_function(value: float, c_mu: float, c_sigma: float):
-        '''
-        Bell Gaussian function
-
-        Used for calculating growth values
-        '''
+    def bell_function(value: float, c_mu: float, c_sigma: float) -> float:
+        """
+        Bell function.
+        Used for calculating growth values.
+        """
         return np.exp(-((value - c_mu) / c_sigma) ** 2 / 2)
 
-    def __smooth_ring_kernel(self, radius: float):
-        mid = self.size // 2
-        Ds = [np.linalg.norm(np.ogrid[-mid : mid, -mid : mid]) / radius * len(k['b']) / k['r'] for k in self.pattern['kernels']]
-        kernels = [(D < len(k['b'])) * np.asarray(k['b'])[np.minimum(D.astype(int), len(k['b']) - 1)] * \
-                   self.__bell_function(D % 1, 0.5, 0.15) for D, k in zip(Ds, self.pattern['kernels'])]
-        nKs = [K / np.sum(K) for K in kernels]
-        fKs = [np.fft.fft2(np.fft.fftshift(K)) for K in nKs]
-        return fKs
+    @staticmethod
+    def soft_clip(value: float) -> float:
+        """
+        Soft clip function.
+        Returns value x: 0 <= x <= 1
+        """
+        return 1 / (1 + cp.exp(-4 * (value - 0.5)))
 
-    def __growth(self, U: float, m: float, s: float):
-        return self.__bell_function(U, m, s) * 2 - 1
+    def __smooth_ring_kernel(self, radius: float) -> list[cp.ndarray]:
+        mid = self.size // 2
+        distance_array = [np.linalg.norm(np.ogrid[-mid : mid, -mid : mid]) / radius * len(k['b']) / k['r']
+                          for k in self.pattern['kernels']]
+        kernels = [(D < len(k['b'])) * np.asarray(k['b'])[np.minimum(D.astype(int), len(k['b']) - 1)] * \
+                   self.bell_function(D % 1, 0.5, 0.15) for D, k in zip(distance_array, self.pattern['kernels'])]
+
+        normalized_kernels = [kernel / np.sum(kernel) for kernel in kernels]
+        fourier_kernels = [np.fft.fft2(np.fft.fftshift(nkernel)) for nkernel in normalized_kernels]
+        return [cp.asarray(K) for K in fourier_kernels]
+
+    def __growth(self, matrix: cp.ndarray, c_mu: float, c_sigma: float):
+        return self.bell_function(matrix, c_mu, c_sigma) * 2 - 1
 
     def __update(self):
-        # Makes our figure to move using FFT
-        fourier_world = [np.fft.fft2(world_chanel) for world_chanel in self.world]
-        Us = [np.real(np.fft.ifft2(fK * fourier_world[k['c0']])) for fK, k in zip(self.fourier_kernels,self.pattern['kernels'])]
-        Gs = [self.__growth(U, k['m'], k['s']) for U, k in zip(Us, self.pattern['kernels'])]
-        Hs = [sum(k['h'] * G for G, k in zip(Gs, self.pattern['kernels']) if k['c1'] == c1) for c1 in range(3)]
-        self.world = [np.clip(A + 1 / self.period * H, 0, 1) for A, H in zip(self.world, Hs)]
+        fourier_world = [cp.fft.fft2(world_chanel) for world_chanel in self.world]
+        wn_sums = [cp.real(cp.fft.ifft2(fK * fourier_world[k['c0']]))
+                      for fK, k in zip(self.fourier_kernels, self.pattern['kernels'])]
+
+        growns = [self.__growth(wn_sum, k['m'], k['s'])
+                  for wn_sum, k in zip(wn_sums, self.pattern['kernels'])]
+
+        growth_heights = [sum(k['h'] * grow
+                        for grow, k in zip(growns, self.pattern['kernels']) if k['c1'] == c1)
+                        for c1 in range(3)]
+
+        self.world = [self.soft_clip(world_chanel + 1 / self.period * g_height)
+                      for world_chanel, g_height  in zip(self.world, growth_heights)]
 
     def next(self):
-        '''
+        """
         Updates the world and return it
-        '''
+        """
         self.__update()
         return self.world
+
+if __name__ == "__main__":
+    import timeit
+
+    leina = Lenia(pattern="emitter", size=512, scale=1, start_x=20, start_y=20, cells_amount=1)
+    print(timeit.timeit(leina.next, number = 1))
